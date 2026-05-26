@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.venv/
+venv/
+env/
+ENV/
+.env
+.env.local
+
+# Trained model artefacts (large binaries — commit only if using Git LFS)
+*.h5
+*.keras
+*.pkl
+*_training_report.png
+best_model.keras
+
+# FastAPI / uvicorn
+.uvicorn_reload
+
+# Node / Vite
+node_modules/
+dist/
+.vite/
+*.local
+
+# OS
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+
+# Test artefacts
+.pytest_cache/
+htmlcov/
+.coverage
