@@ -70,7 +70,7 @@ cryptopredict/
 ### Option 1 — Docker (recommended)
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/cryptopredict.git
+git clone https://github.com/Sm3th/cryptopredict.git
 cd cryptopredict
 
 # 1. Train the model first (runs outside Docker to save the .keras file)
@@ -250,4 +250,4 @@ This project is built for **educational purposes only**. Cryptocurrency markets 
 
 ## 📄 License
 
-MIT © 2026 — [Your Name](https://github.com/YOUR_USERNAME)
+MIT © 2026 — [İsmet Organ](https://github.com/Sm3th)
