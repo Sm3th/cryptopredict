@@ -2,7 +2,7 @@
 
 > AI-powered cryptocurrency price forecasting with an active learning feedback loop.
 
-[![CI](https://github.com/YOUR_USERNAME/cryptopredict/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_USERNAME/cryptopredict/actions)
+[![CI](https://github.com/Sm3th/cryptopredict/actions/workflows/ci.yml/badge.svg)](https://github.com/Sm3th/cryptopredict/actions)
 ![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688?logo=fastapi&logoColor=white)
 ![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=white)
