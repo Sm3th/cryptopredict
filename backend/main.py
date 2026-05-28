@@ -272,7 +272,7 @@ async def root():
     return {
         "status": "online",
         "version": "1.0.0",
-        "model_loaded": state.model is not None,
+        "model_loaded": len(state.models) > 0,
         "docs": "/docs",
     }
 
