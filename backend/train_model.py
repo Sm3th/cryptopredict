@@ -8,6 +8,7 @@ Usage:
 """
 
 import argparse
+import os
 import warnings
 import joblib
 import numpy as np
@@ -135,10 +136,12 @@ def predict_future(model, scaler: MinMaxScaler, last_sequence: np.ndarray, days:
 # TRAINING PIPELINE
 # ============================================================================
 
-def train(coin_id: str = "bitcoin", days: int = 730, seq_length: int = 60, epochs: int = 50):
+def train(coin_id: str = "bitcoin", days: int = 730, seq_length: int = 60, epochs: int = 50, models_dir: str = "models"):
     print("\n" + "=" * 60)
     print("  CRYPTOPREDICT — MODEL TRAINING")
     print("=" * 60)
+
+    os.makedirs(models_dir, exist_ok=True)
 
     # 1. Data
     df = fetch_crypto_data(coin_id, days)
@@ -160,7 +163,7 @@ def train(coin_id: str = "bitcoin", days: int = 730, seq_length: int = 60, epoch
 
     callbacks = [
         EarlyStopping(monitor="val_loss", patience=10, restore_best_weights=True, verbose=1),
-        ModelCheckpoint("best_model.keras", monitor="val_loss", save_best_only=True, verbose=0),
+        ModelCheckpoint(os.path.join(models_dir, f"{coin_id}_best.keras"), monitor="val_loss", save_best_only=True, verbose=0),
     ]
 
     print(f"\n  Training for up to {epochs} epochs...")
@@ -195,10 +198,12 @@ def train(coin_id: str = "bitcoin", days: int = 730, seq_length: int = 60, epoch
     _plot_results(df, actuals, preds, history, coin_id)
 
     # 7. Save
-    model.save("crypto_lstm_model.keras")
-    joblib.dump(scaler, "scaler.pkl")
-    print("\n  ✓ Model  → crypto_lstm_model.keras")
-    print("  ✓ Scaler → scaler.pkl")
+    model_path  = os.path.join(models_dir, f"{coin_id}_model.keras")
+    scaler_path = os.path.join(models_dir, f"{coin_id}_scaler.pkl")
+    model.save(model_path)
+    joblib.dump(scaler, scaler_path)
+    print(f"\n  ✓ Model  → {model_path}")
+    print(f"  ✓ Scaler → {scaler_path}")
 
     return model, scaler, df
 
@@ -257,6 +262,7 @@ if __name__ == "__main__":
     parser.add_argument("--days",       type=int, default=730,       help="Days of historical data")
     parser.add_argument("--seq_length", type=int, default=60,        help="Lookback window (days)")
     parser.add_argument("--epochs",     type=int, default=50,        help="Max training epochs")
+    parser.add_argument("--models_dir", type=str, default=os.getenv("MODELS_DIR", "models"), help="Directory to save models")
     args = parser.parse_args()
 
     model, scaler, df = train(
@@ -264,6 +270,7 @@ if __name__ == "__main__":
         days=args.days,
         seq_length=args.seq_length,
         epochs=args.epochs,
+        models_dir=args.models_dir,
     )
 
     # 7-day forecast

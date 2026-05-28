@@ -32,6 +32,7 @@ async def test_health(client):
     assert r.status_code == 200
     data = r.json()
     assert "model_loaded" in data
+    assert "models_loaded" in data
     assert "feedback_count" in data
 
 
@@ -62,11 +63,11 @@ async def test_feedback_history(client):
 @pytest.mark.anyio
 async def test_predict_no_model(client):
     """Should return 503 when model not loaded."""
-    original = state.model
-    state.model = None
+    original = state.models.pop("bitcoin", None)
     r = await client.post("/api/predict", json={"coin_id": "bitcoin", "days": 7})
     assert r.status_code == 503
-    state.model = original
+    if original is not None:
+        state.models["bitcoin"] = original
 
 
 @pytest.mark.anyio

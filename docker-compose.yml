@@ -10,8 +10,7 @@ services:
     volumes:
       - model_data:/app/models
     environment:
-      - MODEL_PATH=/app/models/crypto_lstm_model.keras
-      - SCALER_PATH=/app/models/scaler.pkl
+      - MODELS_DIR=/app/models
       - ALLOWED_ORIGINS=http://localhost:5173,http://localhost:80
     restart: unless-stopped
 

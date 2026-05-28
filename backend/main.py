@@ -79,12 +79,15 @@ app.add_middleware(
 # GLOBAL STATE
 # ============================================================================
 
+SUPPORTED_COINS = ["bitcoin", "ethereum", "cardano", "solana", "ripple"]
+
+
 class ModelState:
     """Thread-safe global model state management."""
 
     def __init__(self):
-        self.model = None
-        self.scaler = None
+        self.models: Dict[str, Any] = {}
+        self.scalers: Dict[str, Any] = {}
         self.feedback_queue: deque = deque(maxlen=100)
         self._lock = asyncio.Lock()
         self.metrics: Dict[str, Any] = {
@@ -96,26 +99,42 @@ class ModelState:
             "feedback_count": 0,
         }
         self.retrain_in_progress = False
-        self._load_model()
+        self._load_models()
         self._load_feedback()
         self._load_metrics()
 
-    def _load_model(self):
-        try:
-            model_path = os.getenv("MODEL_PATH", "crypto_lstm_model.keras")
-            scaler_path = os.getenv("SCALER_PATH", "scaler.pkl")
-            # Also support legacy .h5
-            if not os.path.exists(model_path):
-                model_path = "crypto_lstm_model.h5"
+    def _load_models(self):
+        models_dir = os.getenv("MODELS_DIR", "models")
+        loaded = []
+        for coin in SUPPORTED_COINS:
+            model_path  = os.path.join(models_dir, f"{coin}_model.keras")
+            scaler_path = os.path.join(models_dir, f"{coin}_scaler.pkl")
             if os.path.exists(model_path) and os.path.exists(scaler_path):
+                try:
+                    from tensorflow import keras
+                    self.models[coin]  = keras.models.load_model(model_path)
+                    self.scalers[coin] = joblib.load(scaler_path)
+                    loaded.append(coin)
+                except Exception as e:
+                    print(f"✗ Error loading model for {coin}: {e}")
+        if loaded:
+            print(f"✓ Models loaded: {', '.join(loaded)}")
+        else:
+            print("⚠ No pre-trained models found. Train via train_model.py first.")
+
+    def reload_coin(self, coin: str):
+        """Reload a single coin's model after retraining."""
+        models_dir = os.getenv("MODELS_DIR", "models")
+        model_path  = os.path.join(models_dir, f"{coin}_model.keras")
+        scaler_path = os.path.join(models_dir, f"{coin}_scaler.pkl")
+        if os.path.exists(model_path) and os.path.exists(scaler_path):
+            try:
                 from tensorflow import keras
-                self.model = keras.models.load_model(model_path)
-                self.scaler = joblib.load(scaler_path)
-                print("✓ Model loaded successfully")
-            else:
-                print("⚠ No pre-trained model found. Train via train_model.py first.")
-        except Exception as e:
-            print(f"✗ Error loading model: {e}")
+                self.models[coin]  = keras.models.load_model(model_path)
+                self.scalers[coin] = joblib.load(scaler_path)
+                print(f"✓ Reloaded model for {coin}")
+            except Exception as e:
+                print(f"✗ Error reloading model for {coin}: {e}")
 
     def _safe_load_json(self, path: str, default):
         """Load JSON from file, returning default on any error."""
@@ -256,8 +275,8 @@ async def root():
 async def health_check():
     return {
         "status": "healthy",
-        "model_loaded": state.model is not None,
-        "scaler_loaded": state.scaler is not None,
+        "model_loaded": len(state.models) > 0,
+        "models_loaded": list(state.models.keys()),
         "feedback_count": len(state.feedback_queue),
         "total_predictions": state.metrics["total_predictions"],
         "retrain_in_progress": state.retrain_in_progress,
@@ -266,10 +285,12 @@ async def health_check():
 
 @app.post("/api/predict", response_model=PredictionResponse)
 async def predict(request: PredictionRequest):
-    if state.model is None or state.scaler is None:
+    model  = state.models.get(request.coin_id)
+    scaler = state.scalers.get(request.coin_id)
+    if model is None or scaler is None:
         raise HTTPException(
             status_code=503,
-            detail="Model not loaded. Run train_model.py first to generate the model.",
+            detail=f"Model for '{request.coin_id}' not loaded. Run train_model.py --coin {request.coin_id} first.",
         )
     try:
         df = fetch_crypto_data(request.coin_id, days=365)
@@ -277,10 +298,10 @@ async def predict(request: PredictionRequest):
         current_price = float(df["price"].iloc[-1])
 
         price_data = df["price"].values
-        scaled_data = state.scaler.transform(price_data.reshape(-1, 1)).flatten()
+        scaled_data = scaler.transform(price_data.reshape(-1, 1)).flatten()
         last_60 = scaled_data[-60:]
 
-        raw_predictions = predict_future(state.model, state.scaler, last_60, days=request.days)
+        raw_predictions = predict_future(model, scaler, last_60, days=request.days)
         sentiment, sentiment_score = get_sentiment_score(request.coin_id)
         confidence = calculate_confidence(raw_predictions, price_data)
 
@@ -362,8 +383,6 @@ async def submit_feedback(feedback: FeedbackRequest):
 async def retrain_model(request: RetrainRequest, background_tasks: BackgroundTasks):
     if state.retrain_in_progress:
         raise HTTPException(status_code=409, detail="Retraining already in progress.")
-    if state.scaler is None:
-        raise HTTPException(status_code=503, detail="Scaler not loaded. Train initial model first.")
 
     def retrain_task():
         try:
@@ -371,12 +390,23 @@ async def retrain_model(request: RetrainRequest, background_tasks: BackgroundTas
             from tensorflow.keras.models import Sequential
             from tensorflow.keras.layers import LSTM, Dense, Dropout
             from tensorflow.keras.callbacks import EarlyStopping
+            import joblib as _joblib
 
+            models_dir = os.getenv("MODELS_DIR", "models")
+            os.makedirs(models_dir, exist_ok=True)
+
+            existing_scaler = state.scalers.get(request.coin_id)
             df = fetch_crypto_data(request.coin_id, days=request.days)
             df = add_technical_indicators(df)
-
             price_data = df["price"].values.reshape(-1, 1)
-            scaled_data = state.scaler.transform(price_data)
+
+            if existing_scaler is not None:
+                scaled_data = existing_scaler.transform(price_data)
+                scaler = existing_scaler
+            else:
+                from sklearn.preprocessing import MinMaxScaler
+                scaler = MinMaxScaler(feature_range=(0, 1))
+                scaled_data = scaler.fit_transform(price_data)
 
             X, y = create_sequences(scaled_data, seq_length=60)
             train_size = int(len(X) * 0.8)
@@ -404,11 +434,15 @@ async def retrain_model(request: RetrainRequest, background_tasks: BackgroundTas
                 verbose=0,
             )
 
-            model.save("crypto_lstm_model.keras")
-            state.model = model
+            model_path  = os.path.join(models_dir, f"{request.coin_id}_model.keras")
+            scaler_path = os.path.join(models_dir, f"{request.coin_id}_scaler.pkl")
+            model.save(model_path)
+            _joblib.dump(scaler, scaler_path)
+            state.models[request.coin_id]  = model
+            state.scalers[request.coin_id] = scaler
             state.metrics["last_retrain"] = datetime.now().isoformat()
             state.save_metrics()
-            print("✓ Model retrained successfully")
+            print(f"✓ Model retrained for {request.coin_id}")
         except Exception as e:
             print(f"✗ Retrain failed: {e}")
         finally:
