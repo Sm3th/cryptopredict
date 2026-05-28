@@ -8,7 +8,6 @@ Usage:
 """
 
 import argparse
-import os
 import warnings
 import joblib
 import numpy as np
@@ -16,16 +15,13 @@ import pandas as pd
 import requests
 import matplotlib.pyplot as plt
 import seaborn as sns
-from datetime import datetime
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-
-warnings.filterwarnings("ignore")
-
-from tensorflow import keras
 from keras.models import Sequential
 from keras.layers import LSTM, Dense, Dropout
 from keras.callbacks import EarlyStopping, ModelCheckpoint
+
+warnings.filterwarnings("ignore")
 
 # ============================================================================
 # DATA COLLECTION
