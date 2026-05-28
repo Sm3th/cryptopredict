@@ -14,6 +14,8 @@ import joblib
 import numpy as np
 import pandas as pd
 import requests
+import matplotlib
+matplotlib.use("Agg")  # headless backend — no display required (Docker/CI)
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.preprocessing import MinMaxScaler
@@ -248,7 +250,7 @@ def _plot_results(df, actuals, preds, history, coin_id: str):
 
     plt.tight_layout()
     plt.savefig(f"{coin_id}_training_report.png", dpi=150)
-    plt.show()
+    plt.close(fig)
     print(f"  ✓ Plot saved → {coin_id}_training_report.png")
 
 
