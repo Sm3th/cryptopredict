@@ -9,6 +9,7 @@ Usage:
 
 import argparse
 import os
+import time
 import warnings
 import joblib
 import numpy as np
@@ -31,13 +32,20 @@ warnings.filterwarnings("ignore")
 # ============================================================================
 
 def fetch_crypto_data(coin_id: str = "bitcoin", days: int = 730) -> pd.DataFrame:
-    """Fetch OHLCV data from CoinGecko (free tier)."""
+    """Fetch OHLCV data from CoinGecko (free tier) with retry on 429."""
     url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
     params = {"vs_currency": "usd", "days": days, "interval": "daily"}
 
     print(f"→ Fetching {coin_id} data ({days} days)...")
-    response = requests.get(url, params=params, timeout=20)
-    response.raise_for_status()
+    for attempt in range(5):
+        response = requests.get(url, params=params, timeout=20)
+        if response.status_code == 429:
+            wait = 60 * (attempt + 1)
+            print(f"  ⚠ Rate limited. Waiting {wait}s before retry ({attempt + 1}/5)...")
+            time.sleep(wait)
+            continue
+        response.raise_for_status()
+        break
     data = response.json()
 
     df = pd.DataFrame({

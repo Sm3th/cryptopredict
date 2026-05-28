@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 import asyncio
+import time
 import numpy as np
 import pandas as pd
 import requests
@@ -174,7 +175,12 @@ def fetch_crypto_data(coin_id: str = "bitcoin", days: int = 365) -> pd.DataFrame
     url = f"https://api.coingecko.com/api/v3/coins/{coin_id}/market_chart"
     params = {"vs_currency": "usd", "days": days, "interval": "daily"}
     try:
-        response = requests.get(url, params=params, timeout=15)
+        for attempt in range(4):
+            response = requests.get(url, params=params, timeout=15)
+            if response.status_code == 429:
+                time.sleep(30 * (attempt + 1))
+                continue
+            break
         response.raise_for_status()
         data = response.json()
 
