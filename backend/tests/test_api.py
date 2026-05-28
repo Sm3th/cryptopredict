@@ -4,11 +4,6 @@ Run with: pytest tests/ -v
 """
 import pytest
 from httpx import AsyncClient, ASGITransport
-from unittest.mock import patch, MagicMock
-import numpy as np
-
-import sys, os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from main import app, state
 
